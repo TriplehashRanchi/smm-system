@@ -1,0 +1,22 @@
+# Dependencies and generated output
+node_modules/
+.next/
+out/
+dist/
+backend/generated/
+*.log
+
+# Local configuration; commit templates only
+.env
+.env.*
+!.env.example
+!.env.local.example
+.local/
+
+# Firebase Admin service account credentials
+firebase-admin*.json
+*service-account*.json
+
+# Operating system files
+.DS_Store
+Thumbs.db

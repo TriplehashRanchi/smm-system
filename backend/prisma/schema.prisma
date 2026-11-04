@@ -1,0 +1,372 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+enum Role {
+  AGENCY
+  CLIENT
+}
+
+enum UserStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum ClientStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum Platform {
+  INSTAGRAM
+  LINKEDIN
+  FACEBOOK
+  YOUTUBE
+  OTHER
+}
+
+model User {
+  id              String                 @id @default(cuid())
+  firebaseUid     String                 @unique @db.VarChar(128)
+  email           String                 @unique @db.VarChar(254)
+  name            String                 @db.VarChar(120)
+  role            Role
+  status          UserStatus             @default(ACTIVE)
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+  clientAccess    ClientUserAccess[]
+  activityEvents  ActivityEvent[]
+  contentIdeas    ContentIdea[] @relation("IdeaAuthor")
+  createdContent  ContentItem[] @relation("ContentAuthor")
+  ownedContent    ContentItem[] @relation("ContentOwner")
+  contributedContent ContentItem[] @relation("ContentContributor")
+  calendarNotes   CalendarNote[]
+  contentRevisions ContentRevision[]
+  reportedHandoffs MediaHandoff[] @relation("HandoffReporter")
+  verifiedHandoffs MediaHandoff[] @relation("HandoffVerifier")
+  productionApprovals ProductionApproval[]
+  approvalRequests ApprovalRequest[]
+  suggestions ContentSuggestion[] @relation("SuggestionAuthor")
+  reviewedSuggestions ContentSuggestion[] @relation("SuggestionReviewer")
+  publishedPosts ContentItem[] @relation("PostPublisher")
+}
+
+model Client {
+  id              String                 @id @default(cuid())
+  name            String                 @db.VarChar(160)
+  timezone        String                 @default("Asia/Kolkata") @db.VarChar(80)
+  status          ClientStatus           @default(ACTIVE)
+  internalNotes   String?                @db.Text
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+  socialAccounts  SocialAccount[]
+  clientAccess    ClientUserAccess[]
+  activityEvents  ActivityEvent[]
+  contentIdeas    ContentIdea[]
+  calendarNotes   CalendarNote[]
+  suggestions ContentSuggestion[]
+}
+
+model ClientUserAccess {
+  userId    String
+  clientId  String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  @@id([userId, clientId])
+  @@index([clientId])
+}
+
+model SocialAccount {
+  id                String            @id @default(cuid())
+  clientId          String
+  platform          Platform
+  handle            String            @db.VarChar(160)
+  timezone          String            @default("Asia/Kolkata") @db.VarChar(80)
+  active            Boolean           @default(true)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  client            Client            @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  publishingTargets PublishingTarget[]
+  contentItems      ContentItem[]
+  @@unique([clientId, platform, handle])
+}
+
+model PublishingTarget {
+  id              String        @id @default(cuid())
+  socialAccountId String
+  contentType     String        @default("ALL") @db.VarChar(40)
+  targetCount     Int
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  socialAccount   SocialAccount @relation(fields: [socialAccountId], references: [id], onDelete: Restrict)
+  @@unique([socialAccountId, contentType])
+}
+
+model ActivityEvent {
+  id        String   @id @default(cuid())
+  actorId   String
+  clientId  String?
+  contentItemId String?
+  eventType String   @db.VarChar(80)
+  details   Json
+  createdAt DateTime @default(now())
+  actor     User     @relation(fields: [actorId], references: [id], onDelete: Restrict)
+  client    Client?  @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  contentItem ContentItem? @relation(fields: [contentItemId], references: [id], onDelete: SetNull)
+  @@index([clientId, createdAt])
+  @@index([contentItemId, createdAt])
+}
+
+enum PlanningStatus {
+  DRAFT
+  TENTATIVE
+  IN_PROGRESS
+  APPROVED
+  CANCELLED
+}
+
+enum ContentPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+model ContentIdea {
+  id          String @id @default(cuid())
+  clientId    String
+  title       String @db.VarChar(200)
+  brief       String @db.Text
+  notes       String @db.Text
+  bucket      String @default("") @db.VarChar(120)
+  campaign    String @default("") @db.VarChar(120)
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  client      Client @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  createdBy   User @relation("IdeaAuthor", fields: [createdById], references: [id], onDelete: Restrict)
+  items       ContentItem[]
+  @@index([clientId, createdAt])
+}
+
+model ContentItem {
+  id             String @id @default(cuid())
+  ideaId         String?
+  socialAccountId String
+  title          String @db.VarChar(200)
+  contentType    String @db.VarChar(40)
+  script         String @db.Text
+  caption        String @db.Text
+  publishAt      DateTime?
+  dueAt          DateTime?
+  status         PlanningStatus @default(DRAFT)
+  priority       ContentPriority @default(NORMAL)
+  ownerId        String?
+  contributorId  String?
+  createdById    String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  productionStage ProductionStage @default(PLANNED)
+  resumeStage     ProductionStage?
+  requiresScriptApproval Boolean @default(false)
+  requiresFootage Boolean @default(false)
+  requiresFinalApproval Boolean @default(true)
+  scriptVersion Int @default(1)
+  creativeVersion Int @default(1)
+  scriptApprovalStatus ApprovalGate @default(NOT_REQUIRED)
+  scriptApprovedVersion Int?
+  finalApprovalStatus ApprovalGate @default(NOT_REQUESTED)
+  finalApprovedVersion Int?
+  shootStatus ShootStatus @default(NOT_REQUIRED)
+  shootAt DateTime?
+  shootCompletedAt DateTime?
+  footageStatus FootageStatus @default(NOT_REQUIRED)
+  handoffVersion Int @default(0)
+  verifiedFootageVersion Int?
+  qaStatus QaStatus @default(NOT_STARTED)
+  qaVersion Int?
+  qaNote String @default("") @db.Text
+  creativeReference String @default("") @db.Text
+  internalProductionNotes String @default("") @db.Text
+  clientFeedback String @default("") @db.Text
+  holdReason String @default("") @db.Text
+  allowExternalFinalApproval Boolean @default(false)
+  clientActionDueAt DateTime?
+  publishedAt DateTime?
+  publishedUrl String @default("") @db.VarChar(2000)
+  likes Int? @db.UnsignedInt
+  comments Int? @db.UnsignedInt
+  views Int? @db.UnsignedInt
+  metricsUpdatedAt DateTime?
+  publishedById String?
+  publishedBy User? @relation("PostPublisher", fields: [publishedById], references: [id], onDelete: Restrict)
+  idea           ContentIdea? @relation(fields: [ideaId], references: [id], onDelete: Restrict)
+  socialAccount  SocialAccount @relation(fields: [socialAccountId], references: [id], onDelete: Restrict)
+  owner          User? @relation("ContentOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  contributor    User? @relation("ContentContributor", fields: [contributorId], references: [id], onDelete: Restrict)
+  createdBy      User @relation("ContentAuthor", fields: [createdById], references: [id], onDelete: Restrict)
+  activityEvents ActivityEvent[]
+  revisions ContentRevision[]
+  mediaHandoffs MediaHandoff[]
+  approvals ProductionApproval[]
+  approvalRequests ApprovalRequest[]
+  @@index([ideaId])
+  @@index([socialAccountId, publishAt])
+  @@index([publishAt, status])
+  @@index([productionStage, dueAt])
+}
+
+enum ProductionStage {
+  PLANNED
+  DRAFTING
+  CLIENT_INPUT
+  PRODUCTION
+  INTERNAL_REVIEW
+  CLIENT_FINAL_REVIEW
+  READY
+  PUBLISHED
+  ON_HOLD
+  CANCELLED
+}
+enum ApprovalGate {
+  NOT_REQUIRED
+  NOT_REQUESTED
+  PENDING
+  APPROVED
+  CHANGES_REQUESTED
+}
+enum ShootStatus {
+  NOT_REQUIRED
+  NOT_STARTED
+  SCHEDULED
+  RECORDED
+}
+enum FootageStatus {
+  NOT_REQUIRED
+  NOT_SENT
+  REPORTED_SENT
+  VERIFIED_RECEIVED
+  NEEDS_MORE
+}
+enum QaStatus {
+  NOT_STARTED
+  FAILED
+  PASSED
+}
+
+model ContentRevision {
+  id String @id @default(cuid())
+  contentItemId String
+  kind String @db.VarChar(20)
+  version Int
+  script String @db.Text
+  caption String @db.Text
+  creativeReference String @db.Text
+  createdById String
+  createdAt DateTime @default(now())
+  contentItem ContentItem @relation(fields: [contentItemId], references: [id], onDelete: Restrict)
+  createdBy User @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  @@unique([contentItemId, kind, version])
+}
+model MediaHandoff {
+  id String @id @default(cuid())
+  contentItemId String
+  sequence Int
+  channel String @db.VarChar(20)
+  channelName String @db.VarChar(160)
+  senderName String @db.VarChar(160)
+  description String @db.Text
+  sentAt DateTime?
+  clipCount Int?
+  messageReference String @db.Text
+  reportedById String
+  createdAt DateTime @default(now())
+  verificationStatus FootageStatus @default(REPORTED_SENT)
+  verificationNote String @default("") @db.Text
+  verifiedById String?
+  verifiedAt DateTime?
+  contentItem ContentItem @relation(fields: [contentItemId], references: [id], onDelete: Restrict)
+  reportedBy User @relation("HandoffReporter", fields: [reportedById], references: [id], onDelete: Restrict)
+  verifiedBy User? @relation("HandoffVerifier", fields: [verifiedById], references: [id], onDelete: Restrict)
+  @@unique([contentItemId, sequence])
+}
+model ProductionApproval {
+  id String @id @default(cuid())
+  contentItemId String
+  kind String @db.VarChar(20)
+  version Int
+  decision ApprovalGate
+  source String @db.VarChar(20)
+  reference String @db.Text
+  recordedById String
+  origin String @default("RECORDED_BY_AGENCY") @db.VarChar(30)
+  feedback String @default("") @db.Text
+  acknowledgement String @default("") @db.Text
+  requestId String? @unique
+  createdAt DateTime @default(now())
+  contentItem ContentItem @relation(fields: [contentItemId], references: [id], onDelete: Restrict)
+  recordedBy User @relation(fields: [recordedById], references: [id], onDelete: Restrict)
+  request ApprovalRequest? @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  @@index([contentItemId, createdAt])
+}
+
+model ApprovalRequest {
+  id String @id @default(cuid())
+  contentItemId String
+  kind String @db.VarChar(20)
+  version Int
+  status String @default("PENDING") @db.VarChar(30)
+  title String @db.VarChar(200)
+  script String @db.Text
+  caption String @db.Text
+  creativeReference String @db.Text
+  summary String @db.Text
+  reviewLocation String @db.VarChar(20)
+  previewUrl String @default("") @db.VarChar(2000)
+  dueAt DateTime?
+  requestedById String
+  createdAt DateTime @default(now())
+  closedAt DateTime?
+  contentItem ContentItem @relation(fields: [contentItemId], references: [id], onDelete: Restrict)
+  requestedBy User @relation(fields: [requestedById], references: [id], onDelete: Restrict)
+  decision ProductionApproval?
+  @@index([contentItemId, status, createdAt])
+}
+
+model ContentSuggestion {
+  id String @id @default(cuid())
+  clientId String
+  createdById String
+  title String @db.VarChar(200)
+  body String @db.Text
+  status String @default("SUBMITTED") @db.VarChar(30)
+  response String @default("") @db.Text
+  reviewedById String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  client Client @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  createdBy User @relation("SuggestionAuthor", fields: [createdById], references: [id], onDelete: Restrict)
+  reviewedBy User? @relation("SuggestionReviewer", fields: [reviewedById], references: [id], onDelete: Restrict)
+  @@index([clientId, createdAt])
+}
+
+model CalendarNote {
+  id            String @id @default(cuid())
+  clientId      String
+  title         String @db.VarChar(200)
+  body          String @db.Text
+  date          DateTime @db.Date
+  kind          String @default("OTHER") @db.VarChar(30)
+  clientVisible Boolean @default(false)
+  createdById   String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  client        Client @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  createdBy     User @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  @@index([clientId, date])
+}

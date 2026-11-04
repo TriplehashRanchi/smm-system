@@ -1,0 +1,27 @@
+{
+  "name": "social-media-operations-system",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "concurrently --kill-others -n api,web -c blue,green \"npm run dev --workspace backend\" \"npm run dev --workspace frontend\"",
+    "build": "npm run generate --workspace backend && npm run build --workspace frontend",
+    "db:generate": "npm run generate --workspace backend",
+    "db:deploy": "npm run db:deploy --workspace backend",
+    "bootstrap:agency": "npm run bootstrap:agency --workspace backend"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  },
+  "overrides": {
+    "@grpc/grpc-js": "1.14.7",
+    "@firebase/app": "0.16.2",
+    "@firebase/app-compat": "0.5.18"
+  }
+}
