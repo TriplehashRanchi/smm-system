@@ -11,7 +11,9 @@ import { onIdTokenChanged, signOut } from "@firebase/auth";
 import { authMessage, getFirebaseAuth } from "../lib/firebase";
 
 const AuthContext = createContext(null);
-const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:4000";
+const configuredApiBase = (process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:4000").replace(/\/+$/, "");
+// A page served over HTTPS cannot call an http:// API (mixed content), so upgrade remote addresses; localhost stays as is.
+const apiBase = typeof window !== "undefined" && window.location.protocol === "https:" && /^http:\/\/(?!localhost|127\.0\.0\.1)/.test(configuredApiBase) ? configuredApiBase.replace(/^http:/, "https:") : configuredApiBase;
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
